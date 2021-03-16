@@ -134,8 +134,10 @@ include("systems/alias_elimination.jl")
 include("structural_transformation/StructuralTransformations.jl")
 @reexport using .StructuralTransformations
 
-include("systems/diffeqs/parentodesystem.jl")
-export ParentODESystem, has_parent, get_parent, insert_comp!, rm_sys_namespace, get_lhs_systems, collect_mappings, collect_mappings!, split_systems
+#include("systems/diffeqs/parentodesystem.jl")
+#export ParentODESystem, has_parent, get_parent
+export rm_sys_namespace, get_lhs_systems, collect_mappings, collect_mappings!, split_systems
+export connect_comp!, insert_comp!
 
 export ODESystem, ODEFunction, ODEFunctionExpr, ODEProblemExpr
 export SDESystem, SDEFunction, SDEFunctionExpr, SDESystemExpr

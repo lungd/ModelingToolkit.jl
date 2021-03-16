@@ -82,6 +82,7 @@ function ODESystem(
                    observed = Num[],
                    systems = ODESystem[],
                    name=gensym(:ODESystem),
+                   parent=nothing,
                    default_u0=Dict(),
                    default_p=Dict(),
                   )
@@ -102,7 +103,12 @@ function ODESystem(
     if length(unique(sysnames)) != length(sysnames)
         throw(ArgumentError("System names must be unique."))
     end
-    ODESystem(deqs, iv′, dvs′, ps′, observed, tgrad, jac, Wfact, Wfact_t, name, systems, default_u0, default_p, nothing, [])
+    sys = ODESystem(deqs, iv′, dvs′, ps′, observed, tgrad, jac, Wfact, Wfact_t, name, systems, default_u0, default_p, nothing, [])
+
+    if parent != nothing && parent != false
+        push!(get_systems(parent), sys)
+    end
+    return sys
 end
 
 iv_from_nested_derivative(x::Term) = operation(x) isa Differential ? iv_from_nested_derivative(arguments(x)[1]) : arguments(x)[1]
@@ -283,4 +289,131 @@ function _eq_unordered(a, b)
         delete!(idxs, idx)
     end
     return true
+end
+
+
+
+
+function connect_comp!(parent::ODESystem, sys, eqs::Vector{Equation}; insert=false)
+    if parent == nothing || parent == false
+        return
+    end
+
+    if insert && sys != nothing
+        push!(get_systems(parent), sys)
+    end
+
+    for e in eqs
+        eq_without_parent_ns = rm_sys_namespace(parent, e)
+        lhs_without_parent_ns = eq_without_parent_ns.lhs
+        rhs_without_parent_ns = eq_without_parent_ns.rhs
+
+
+        sys_array = split_systems(parent, e.lhs)
+        lhs_pairs, sys_array = collect_mappings!(parent,e,sys_array)
+
+        for pair in lhs_pairs
+            if pair[2] != nothing
+                rhs_without_parent_ns += pair[2]
+            end
+        end
+
+        push!(get_eqs(parent), lhs_without_parent_ns ~ rhs_without_parent_ns)
+    end
+
+    return
+end
+
+insert_comp!(parent::ODESystem, sys, eqs::Vector{Equation}) = connect_comp!(parent,sys,eqs,insert=true)
+
+
+function rm_sys_namespace(sys::AbstractSystem, ex)
+    lvls_sym = Symbol.(split(string(ex), "₊"))
+    lvls_sym[end] = Symbol(split(string(lvls_sym[end]), "(t)")[1])
+    dst_sym = lvls_sym[end]
+    without_sys_ns = ex
+    if startswith(string(ex), string(nameof(sys)))
+        if length(lvls_sym) == 2
+            without_sys_ns = getproperty(sys, dst_sym, namespace=false)
+        elseif length(lvls_sym) > 2
+            curr = getproperty(sys, lvls_sym[2], namespace=false)
+            for l in lvls_sym[3:end-1]
+                curr  = getproperty(curr, l)
+            end
+            without_sys_ns = getproperty(curr, dst_sym)
+        end
+    end
+    return without_sys_ns
+end
+
+
+
+function rm_sys_namespace(sys::AbstractSystem, eq::Equation)
+    lhs_without_sys_ns = rm_sys_namespace(sys,eq.lhs)
+    rhs_without_sys_ns = rm_sys_namespace(sys,eq.rhs)
+    return lhs_without_sys_ns ~ rhs_without_sys_ns
+end
+
+function split_systems(sys::AbstractSystem, ex)
+    lvls = Symbol.(split(string(ex), "₊")[1:end-1])
+    sys_array = AbstractSystem[]
+    if lvls[1] == nameof(sys)
+        push!(sys_array, sys)
+    else
+        push!(sys_array, getproperty(sys, lvls[1], namespace=false))
+    end
+    curr = sys_array[1]
+    for s in lvls[2:end]
+        curr = getproperty(curr, s, namespace=false)
+        push!(sys_array, curr)
+    end
+    return sys_array
+end
+
+function split_systems(sys::AbstractSystem, eq::Equation)
+    split_lhs = split_systems(sys,eq.lhs)
+    split_rhs = split_systems(sys,eq.rhs)
+    return split_lhs, split_rhs
+end
+
+function collect_mappings(sys::AbstractSystem, eq::Equation, sys_array=nothing)
+    if sys_array == nothing
+        sys_array = split_systems(sys,eq.lhs)
+    end
+    lvls_sym = Symbol.(split(string(eq.lhs), "₊"))
+    lvls_sym[end] = Symbol(split(string(lvls_sym[end]), "(t)")[1])
+    dst_sym = lvls_sym[end]
+    lhs_pairs = []
+    for i in 1:length(sys_array)-1
+        curr = sys_array[i+1]
+        for j in i+2:length(sys_array)
+            curr = getproperty(curr, nameof(sys_array[j]))
+        end
+        push!(lhs_pairs, getproperty(curr, dst_sym) => nothing)
+    end
+    push!(lhs_pairs, getproperty(sys_array[end], dst_sym, namespace=false) => nothing)
+    return lhs_pairs, sys_array
+
+
+end
+
+function collect_mappings!(sys::AbstractSystem, eq::Equation, sys_array=nothing)
+    lhs_pairs, sys_array = collect_mappings(sys, eq, sys_array)
+    reverse!(sys_array)
+    reverse!(lhs_pairs)
+
+    # search for existing equations and override with tautology so it will get removed when simplified
+    for (i,s) in enumerate(sys_array)
+        for (j,se) in enumerate(ModelingToolkit.get_eqs(s))
+            if string(se.lhs) == string(lhs_pairs[i][1])
+                lhs_pairs[i] = lhs_pairs[i][1] => se.rhs
+                ModelingToolkit.get_eqs(s)[j] = get_iv(s) ~ get_iv(s)
+                #ModelingToolkit.get_eqs(s)[j] = ModelingToolkit.get_eqs(s)[1]
+                break
+            end
+        end
+    end
+    reverse!(sys_array)
+    reverse!(lhs_pairs)
+    return lhs_pairs, sys_array
 end

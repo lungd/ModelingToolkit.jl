@@ -7,19 +7,19 @@ using ModelingToolkit: value
 
 function Model(default_u0=[],default_p=[];name=gensym(:Model))
     @parameters t
-    sys = ParentODESystem(false, [], t, name=name)
+    sys = ODESystem([], t, name=name)
     return sys
     #Component(;name=name)
 end
 
 function Network(parent=nothing,default_u0=[],default_p=[];name=gensym(:net))
     @parameters t
-    return ParentODESystem(parent,[],t,default_u0=default_u0,default_p=default_p,name=name)
+    return ODESystem([],t,default_u0=default_u0,default_p=default_p,name=name, parent=parent)
 end
 
 function Cell(parent=nothing,default_u0=[],default_p=[];name=gensym(:cell))
     @parameters t
-    return ParentODESystem(parent,[],t,default_u0=default_u0,default_p=default_p,name=name)
+    return ODESystem([],t,default_u0=default_u0,default_p=default_p,name=name, parent=parent)
 end
 
 
@@ -51,7 +51,7 @@ function MySoma(parent=nothing,default_u0=[],default_p=[];name=gensym(:Soma))
     default_p = [
         C_m => 1.0,
     ]
-    return ParentODESystem(parent,eqs,t,default_u0=default_u0,default_p=default_p,name=name)
+    return ODESystem(eqs,t,default_u0=default_u0,default_p=default_p,name=name, parent=parent)
 end
 
 
@@ -92,7 +92,7 @@ function MyNavChannel(parent=nothing,default_u0=[],default_p=[];name=gensym(:Nav
         vr => -65.0,
         E => 50.0,
     ]
-    return ParentODESystem(parent,eqs,t,default_u0=default_u0,default_p=default_p,name=name)
+    return ODESystem(eqs,t,default_u0=default_u0,default_p=default_p,name=name, parent=parent)
 end
 
 
@@ -122,7 +122,7 @@ function MyKvChannel(parent=nothing,default_u0=[],default_p=[];name=gensym(:KvC)
         vr => -65.0,
         E => -77.0,
     ]
-    return ParentODESystem(parent,eqs,t,default_u0=default_u0,default_p=default_p,name=name)
+    return ODESystem(eqs,t,default_u0=default_u0,default_p=default_p,name=name, parent=parent)
 end
 
 
@@ -143,7 +143,7 @@ function MyLeakChannel(parent=nothing,default_u0=[],default_p=[];name=gensym(:LC
         g => 0.3,
         E => -54.0,
     ]
-    return ParentODESystem(parent,eqs,t,default_u0=default_u0,default_p=default_p,name=name)
+    return ODESystem(eqs,t,default_u0=default_u0,default_p=default_p,name=name, parent=parent)
 end
 
 
@@ -164,52 +164,68 @@ function GJ(parent=nothing,default_u0=[],default_p=[];name=gensym(:GJ))
         g => 0.1,
     ]
 
-    return ParentODESystem(parent,eqs,t,default_u0=default_u0,default_p=default_p,name=name)
+    return ODESystem(eqs,t,default_u0=default_u0,default_p=default_p,name=name, parent=parent)
 end
 
 
 
 
 function create_soma(parent;name=gensym(:soma))
+    # soma = MySoma(parent, name=name)
+    #
+    # @named NavC = MyNavChannel(soma)
+    # @named KvC = MyKvChannel()
+    # @named LC = MyLeakChannel()
+    #
+    #
+    #
+    # connect_comp!(soma, NavC, Equation[
+    #     NavC.v ~ soma.v,
+    #     soma.INa ~ NavC.I,
+    # ])
+    # connect_comp!(soma, KvC, Equation[
+    #     KvC.v ~ soma.v,
+    #     soma.IK ~ KvC.I,
+    # ], insert=true)
+    # insert_comp!(soma, LC, Equation[
+    #     LC.v ~ soma.v,
+    #     soma.IL ~ LC.I,
+    # ])
+
+    # or
     soma = MySoma(parent, name=name)
-
-    @named NavC = MyNavChannel()
-    @named KvC = MyKvChannel()
-    @named LC = MyLeakChannel()
-
-
-    insert_comp!(soma, NavC, Equation[
+    @named NavC = MyNavChannel(soma)
+    @named KvC = MyKvChannel(soma)
+    @named LC = MyLeakChannel(soma)
+    connect_comp!(soma, nothing, Equation[
         NavC.v ~ soma.v,
-        soma.INa ~ NavC.I,
-    ])
-    insert_comp!(soma, KvC, Equation[
         KvC.v ~ soma.v,
-        soma.IK ~ KvC.I,
-    ])
-    insert_comp!(soma, LC, Equation[
         LC.v ~ soma.v,
+        soma.INa ~ NavC.I,
+        soma.IK ~ KvC.I,
         soma.IL ~ LC.I,
     ])
-
-    # mappings = [
-    #     ([:NavC, :sys, :v], [:v]),
-    #     ([:KvC, :sys, :v], [:v]),
-    #     ([:LC, :sys, :v], [:v]),
-    # ]
-    # connections = [
-    #     ([:INa], [:NavC, :sys, :I]),
-    #     ([:IK], [:KvC, :sys, :I]),
-    #     ([:IL], [:LC, :sys, :I]),
-    # ]
-
-    # # cannot use connect_pins! because `v` (soma.v) does not exist here
-    # insert_comp!(NavC, [([:NavC, :sys, :v], [:v])], [([:INa], [:NavC, :sys, :I])])
-    # insert_comp!(KvC, [([:KvC, :sys, :v], [:v])], [([:IK], [:KvC, :sys, :I])])
-    # insert_comp!(LC, [([:LC, :sys, :v], [:v])], [([:IL], [:LC, :sys, :I])])
-
     return soma
 end
 
+
+
+function mapper(sys, integrator, eq)
+    function find_and_add(lhs,eq)
+        dst = string(eq[1])
+        for (i,s) in enumerate(lhs)
+            if string(s) == dst
+                println(i)
+                integrator.u[i] += eq[2]
+                return true
+            end
+            #println("$(string(s)) != $(dst)")
+        end
+        return false
+    end
+    find_and_add(ModelingToolkit.get_states(sys),eq) && return nothing
+    find_and_add([string(o.lhs) for o in ModelingToolkit.get_observed(sys)],eq) && return nothing
+end
 
 # container
 @named model = Model()
@@ -224,6 +240,13 @@ u0 = ModelingToolkit.get_default_u0(sys)
 p = ModelingToolkit.get_default_p(sys)
 prob = ODAEProblem(sys,collect(u0),(0.0,160.0),collect(p),jac=true)
 @time sol = solve(prob,Rosenbrock23())
+plot(sol, vars=[net.hhc1.soma.v])
+
+
+I_step_on = PresetTimeCallback(50,integrator->mapper(sys, integrator, net.hhc1.soma.I_inj => -1))
+I_step_off = PresetTimeCallback(100,integrator->mapper(sys, integrator, net.hhc1.soma.I_inj => +1))
+cbs = CallbackSet(I_step_on,I_step_off)
+@time sol = solve(prob,Rosenbrock23(), callback=cbs)
 plot(sol, vars=[net.hhc1.soma.v])
 
 
@@ -311,3 +334,10 @@ plot(sol4, vars=[net.hhc1.soma.INa, net.hhc2.soma.INa])
 
 plot(sol4, vars=[net.hhc1.soma.I_syn])
 plot(sol4, vars=[net.hhc2.soma.I_syn])
+
+
+I_step_on = PresetTimeCallback(50,integrator->mapper(sys4, integrator, net.hhc1.soma.I_inj => +5))
+I_step_off = PresetTimeCallback(100,integrator->mapper(sys4, integrator, net.hhc1.soma.I_inj => -5))
+cbs = CallbackSet(I_step_on,I_step_off)
+@time sol4 = solve(prob4,Rosenbrock23(), callback=cbs)
+plot(sol4, vars=[net.hhc1.soma.v, net.hhc2.soma.v])
