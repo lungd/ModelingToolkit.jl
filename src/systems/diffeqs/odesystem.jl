@@ -356,6 +356,9 @@ end
 
 function split_systems(sys::AbstractSystem, ex)
     lvls = Symbol.(split(string(ex), "₊")[1:end-1])
+    if length(lvls) <= 0
+        return AbstractSystem[]
+    end
     sys_array = AbstractSystem[]
     if lvls[1] == nameof(sys)
         push!(sys_array, sys)
@@ -384,6 +387,10 @@ function collect_mappings(sys::AbstractSystem, eq::Equation, sys_array=nothing)
     lvls_sym[end] = Symbol(split(string(lvls_sym[end]), "(t)")[1])
     dst_sym = lvls_sym[end]
     lhs_pairs = []
+    if length(sys_array) <= 0
+        push!(lhs_pairs, getproperty(sys, dst_sym, namespace=false) => nothing)
+        return lhs_pairs, sys_array
+    end
     for i in 1:length(sys_array)-1
         curr = sys_array[i+1]
         for j in i+2:length(sys_array)
@@ -403,16 +410,23 @@ function collect_mappings!(sys::AbstractSystem, eq::Equation, sys_array=nothing)
     reverse!(lhs_pairs)
 
     # search for existing equations and override with tautology so it will get removed when simplified
-    for (i,s) in enumerate(sys_array)
+
+    if length(sys_array) <= 0
+        sys_array = [sys]
+    end
+    for i in 1:length(lhs_pairs)
+        pair = lhs_pairs[i]
+        s = sys_array[i]
         for (j,se) in enumerate(ModelingToolkit.get_eqs(s))
-            if string(se.lhs) == string(lhs_pairs[i][1])
-                lhs_pairs[i] = lhs_pairs[i][1] => se.rhs
+            if string(se.lhs) == string(pair[1])
+                lhs_pairs[i] = pair[1] => se.rhs
                 ModelingToolkit.get_eqs(s)[j] = get_iv(s) ~ get_iv(s)
                 #ModelingToolkit.get_eqs(s)[j] = ModelingToolkit.get_eqs(s)[1]
                 break
             end
         end
     end
+
     reverse!(sys_array)
     reverse!(lhs_pairs)
     return lhs_pairs, sys_array
