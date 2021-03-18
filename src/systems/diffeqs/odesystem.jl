@@ -294,7 +294,7 @@ end
 
 
 
-function connect_comp!(parent::ODESystem, sys, eqs::Vector{Equation}; insert=false)
+function connect_comp!(parent::AbstractSystem, sys, eqs::Vector{Equation}; insert=false)
     if parent == nothing || parent == false
         return
     end
@@ -324,7 +324,7 @@ function connect_comp!(parent::ODESystem, sys, eqs::Vector{Equation}; insert=fal
     return
 end
 
-insert_comp!(parent::ODESystem, sys, eqs::Vector{Equation}) = connect_comp!(parent,sys,eqs,insert=true)
+insert_comp!(parent::AbstractSystem, sys, eqs::Vector{Equation}) = connect_comp!(parent,sys,eqs,insert=true)
 
 
 function rm_sys_namespace(sys::AbstractSystem, ex)
