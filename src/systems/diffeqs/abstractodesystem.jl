@@ -286,22 +286,13 @@ function process_DEProblem(constructor, sys::AbstractODESystem,u0map,parammap;
                            kwargs...)
     dvs = states(sys)
     ps = parameters(sys)
-    defaults = merge(default_p(sys), default_u0(sys))
+    defs = defaults(sys)
 
-    if u0map !== nothing
-        u0map′ = lower_mapnames(u0map,get_iv(sys))
-        u0 = varmap_to_vars(u0map′,dvs; defaults=defaults)
-    else
-        u0 = nothing
-    end
+    u0 = varmap_to_vars(u0map,dvs; defaults=defs)
+    p = varmap_to_vars(parammap,ps; defaults=defs)
 
-    if !(parammap isa DiffEqBase.NullParameters)
-        parammap′ = lower_mapnames(parammap)
-        p = varmap_to_vars(parammap′,ps; defaults=defaults)
-    elseif !isempty(defaults)
-        p = varmap_to_vars(Dict(),ps; defaults=defaults)
-    else
-        p = ps
+    if u0 !== nothing
+        length(dvs) == length(u0) || throw(ArgumentError("States ($(length(dvs))) and initial conditions ($(length(u0))) are of different lengths."))
     end
 
     f = constructor(sys,dvs,ps,u0;tgrad=tgrad,jac=jac,checkbounds=checkbounds,
