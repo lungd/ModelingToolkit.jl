@@ -78,13 +78,9 @@ function SDESystem(deqs::AbstractVector{<:Equation}, neqs, iv, dvs, ps;
                    systems = SDESystem[],
                    default_u0=Dict(),
                    default_p=Dict(),
-<<<<<<< HEAD
+                   defaults=_merge(Dict(default_u0), Dict(default_p)),
                    name = gensym(:SDESystem),
                    parent=nothing)
-=======
-                   defaults=_merge(Dict(default_u0), Dict(default_p)),
-                   name = gensym(:SDESystem))
->>>>>>> master
     iv′ = value(iv)
     dvs′ = value.(dvs)
     ps′ = value.(ps)
@@ -99,15 +95,11 @@ function SDESystem(deqs::AbstractVector{<:Equation}, neqs, iv, dvs, ps;
     jac = RefValue{Any}(Matrix{Num}(undef, 0, 0))
     Wfact   = RefValue(Matrix{Num}(undef, 0, 0))
     Wfact_t = RefValue(Matrix{Num}(undef, 0, 0))
-<<<<<<< HEAD
-    sys = SDESystem(deqs, neqs, iv′, dvs′, ps′, observed, tgrad, jac, Wfact, Wfact_t, name, systems, default_u0, default_p)
+    sys = SDESystem(deqs, neqs, iv′, dvs′, ps′, observed, tgrad, jac, Wfact, Wfact_t, name, systems, defaults)
     if parent != nothing && parent != false
         push!(get_systems(parent), sys)
     end
     return sys
-=======
-    SDESystem(deqs, neqs, iv′, dvs′, ps′, observed, tgrad, jac, Wfact, Wfact_t, name, systems, defaults)
->>>>>>> master
 end
 
 function generate_diffusion_function(sys::SDESystem, dvs = states(sys), ps = parameters(sys); kwargs...)
@@ -305,9 +297,9 @@ function SDEFunctionExpr(sys::SDESystem, args...; kwargs...)
     SDEFunctionExpr{true}(sys, args...; kwargs...)
 end
 
-function rename(sys::SDESystem,name)
-    SDESystem(sys.eqs, sys.noiseeqs, sys.iv, sys.states, sys.ps, sys.tgrad, sys.jac, sys.Wfact, sys.Wfact_t, name, sys.systems)
-end
+# function rename(sys::SDESystem,name)
+#     SDESystem(sys.eqs, sys.noiseeqs, sys.iv, sys.states, sys.ps, sys.tgrad, sys.jac, sys.Wfact, sys.Wfact_t, name, sys.systems)
+# end
 
 """
 ```julia

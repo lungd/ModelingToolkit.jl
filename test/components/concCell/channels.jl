@@ -17,6 +17,9 @@ function CavChannel(parent=nothing,default_u0=[],default_p=[];name=gensym(:CavC)
 
     #v = v + 1e-10
 
+    input_vars = [v,Ca,Ca_e]
+    output_vars = [I]
+
     h1 = 52.0
     h2 = 25.0
     k1 = 0.32
@@ -43,18 +46,17 @@ function CavChannel(parent=nothing,default_u0=[],default_p=[];name=gensym(:CavC)
         D(i) ~ α_i*(1.0-i) - β_i*i,
         I ~ I_eq, # after up: ~ 0,
     ]
-    default_u0 = [
+    defaults = [
         a => 0.05293248525724958,
         i => 0.5961207535084603,
-        I => 0.0
+        I => 0.0,
         #a => a_∞,
         #i => i_∞,
         #I => I_eq,
-    ]
-    default_p = [
         g => 20.0, # μm^3/s
     ]
-    return ODESystem(eqs,t,default_u0=default_u0,default_p=default_p,name=name, parent=parent)
+    return ODESystem(eqs,t,defaults=defaults,name=name, parent=parent,
+    input_vars=input_vars,output_vars=output_vars)
 end
 
 
@@ -62,8 +64,14 @@ function NavChannel(parent=nothing,default_u0=[],default_p=[];name=gensym(:NavC)
     @parameters t
     D = Differential(t)
 
+    @variables v(t), Na(t), Na_e(t) # Input
+    @variables I(t) # Output
+
     @parameters g
-    @variables v(t), a(t), i(t), I(t), Na(t), Na_e(t)
+    @variables a(t), i(t)
+
+    input_vars = [v,Na,Na_e]
+    output_vars = [I]
 
     # F = 96.48533                # C/mol
     # R = 8.31446                 # J/(K.mol)
@@ -100,18 +108,17 @@ function NavChannel(parent=nothing,default_u0=[],default_p=[];name=gensym(:NavC)
         D(i) ~ α_i*(1.0-i) - β_i*i,
         I ~ I_eq, # after up: ~ 0,
     ]
-    default_u0 = [
+    defaults = [
         a => 0.033,
         i => 0.887,
-        I => 0.0
+        I => 0.0,
         #a => a_∞,
         #i => i_∞,
         #I => I_eq,
-    ]
-    default_p = [
         g => 1.0, # μm^3/s
     ]
-    return ODESystem(eqs,t,default_u0=default_u0,default_p=default_p,name=name, parent=parent)
+    return ODESystem(eqs,t,defaults=defaults,name=name, parent=parent,
+    input_vars=input_vars,output_vars=output_vars)
 end
 
 
@@ -121,6 +128,9 @@ function KvChannel(parent=nothing,default_u0=[],default_p=[];name=gensym(:KvC))
 
     @parameters g
     @variables v(t), a(t), I(t), K_e(t), K(t)
+
+    input_vars = [v,K,K_e]
+    output_vars = [I]
 
     # F = 96.48533                # C/mol
     # R = 8.31446                 # J/(K.mol)
@@ -146,15 +156,14 @@ function KvChannel(parent=nothing,default_u0=[],default_p=[];name=gensym(:KvC))
         D(a) ~ α_a*(1.0-a) - β_a*a,
         I ~ I_eq, # after up: ~ 0,
     ]
-    default_u0 = [
+    defaults = [
         a => 0.03,
         I => 0.0, # after up: g * a^3 * i * (v - E)
         #v => 0.0,
-    ]
-    default_p = [
         g => 0.3, # μm^3/s
     ]
-    return ODESystem(eqs,t,default_u0=default_u0,default_p=default_p,name=name, parent=parent)
+    return ODESystem(eqs,t,defaults=defaults,name=name, parent=parent,
+    input_vars=input_vars,output_vars=output_vars)
 end
 
 
@@ -165,6 +174,9 @@ function KCaChannel(parent=nothing,default_u0=[],default_p=[];name=gensym(:KvC))
 
     @parameters g
     @variables v(t), a(t), I(t), K_e(t), K(t), Ca(t)
+
+    input_vars = [v,K,K_e, Ca]
+    output_vars = [I]
 
     #v = v + 1e-10
 
@@ -189,15 +201,14 @@ function KCaChannel(parent=nothing,default_u0=[],default_p=[];name=gensym(:KvC))
         D(a) ~ α_a*(1.0-a) - β_a*a,
         I ~ I_eq, # after up: ~ 0,
     ]
-    default_u0 = [
+    defaults = [
         a => 0.3176769140606974,
         I => 0.0, # after up: g * a^3 * i * (v - E)
         #v => 0.0,
-    ]
-    default_p = [
         g => 36.0, # μm^3/s
     ]
-    return ODESystem(eqs,t,default_u0=default_u0,default_p=default_p,name=name, parent=parent)
+    return ODESystem(eqs,t,defaults=defaults,name=name, parent=parent,
+    input_vars=input_vars,output_vars=output_vars)
 end
 
 
@@ -207,6 +218,9 @@ function ClvChannel(parent=nothing,default_u0=[],default_p=[];name=gensym(:ClvC)
 
     @parameters g
     @variables v(t), I(t), Cl_e(t), Cl(t)
+
+    input_vars = [v,Cl,Cl_e]
+    output_vars = [I]
 
     # F = 96.48533                # C/mol
     # R = 8.31446                 # J/(K.mol)
@@ -221,14 +235,13 @@ function ClvChannel(parent=nothing,default_u0=[],default_p=[];name=gensym(:ClvC)
     eqs = [
         I ~ I_eq,
     ]
-    default_u0 = [
+    defaults = [
         I => 0.0, # after up: g * a^3 * i * (v - E)
         #v => 0.0,
-    ]
-    default_p = [
         g => 19.5, # μm^3/s
     ]
-    return ODESystem(eqs,t,default_u0=default_u0,default_p=default_p,name=name, parent=parent)
+    return ODESystem(eqs,t,defaults=defaults,name=name, parent=parent,
+    input_vars=input_vars,output_vars=output_vars)
 end
 
 
@@ -239,16 +252,18 @@ function LeakChannel(parent=nothing,default_u0=[],default_p=[];name=gensym(:Leak
     @parameters g
     @variables v(t), I(t), Ion_e(t), Ion(t)
 
+    input_vars = [v,Ion,Ion_e]
+    output_vars = [I]
+
     eqs = [
         I ~ g * ghk_df(zX, v, Ion, Ion_e)#(v - EIon),
     ]
-    default_u0 = [
+    defaults = [
         I => 0.0,
-    ]
-    default_p = [
         g => 0.01, # μm^3/s
     ]
-    return ODESystem(eqs,t,default_u0=default_u0,default_p=default_p,name=name, parent=parent)
+    return ODESystem(eqs,t,defaults=defaults,name=name, parent=parent,
+    input_vars=input_vars,output_vars=output_vars)
 end
 
 
@@ -284,20 +299,19 @@ function NMDAR(parent=nothing,default_u0=[],default_p=[];name=gensym(:NMDAR))
         IK ~  A * P_NMDA * P_K * MgB * S * ((K-K_e*exp(-ee)) / (1-exp(-ee))),
         INa ~ A * P_NMDA * P_Na * MgB * S * ((Na-Na_e*exp(-ee)) / (1-exp(-ee))),
     ]
-    default_u0 = [
+    defaults = [
         I => 0.0,
         ICa => 0.0,
         IK => 0.0,
         INa => 0.0,
-    ]
-    default_p = [
         A => 1,
         P_NMDA => 3.4,
         P_Ca => 10.2,
         P_K => 1.0,
         P_Na => 1.0,
     ]
-    return ODESystem(eqs,t,default_u0=default_u0,default_p=default_p,name=name, parent=parent)
+    return ODESystem(eqs,t,defaults=defaults,name=name, parent=parent,
+    input_vars=input_vars,output_vars=output_vars)
 end
 
 
@@ -309,6 +323,9 @@ function NKA(parent=nothing,default_u0=[],default_p=[];name=gensym(:NKA))
     @parameters g, k_Na#, k_NKA_K
     @variables I_K(t), I_Na(t), Na(t)#, K(t)
 
+    input_vars = [Na]
+    output_vars = [I_K,I_Na]
+
     #I_NKA = g_NKA * (Na^1.5 / (Na^1.5 + k_NKA_Na^1.5)) * (K^1.5 / (K^1.5 + k_NKA_K^1.5))
     I = g * ((0.62 / (1+(6.7/Na)^3)) + (0.38 / (1+(67.6/Na)^3)))
     eqs = [
@@ -316,17 +333,16 @@ function NKA(parent=nothing,default_u0=[],default_p=[];name=gensym(:NKA))
         I_Na ~ 3*I,
     ]
 
-    default_u0 = [
+    defaults = [
         I_K => 0.0,
         I_Na => 0.0,
-    ]
-    default_p = [
         g => 54.5,#0.4,
         k_Na => 4.5,
         #k_NKA_K => 40.0,
     ]
 
-    return ODESystem(eqs,t,default_u0=default_u0,default_p=default_p,name=name, parent=parent)
+    return ODESystem(eqs,t,defaults=defaults,name=name, parent=parent,
+    input_vars=input_vars,output_vars=output_vars)
 end
 
 
@@ -337,19 +353,69 @@ function KCL(parent=nothing,default_u0=[],default_p=[];name=gensym(:KCL))
     @parameters g
     @variables I_K(t), I_Cl(t), K(t), K_e(t), Cl(t), Cl_e(t)
 
+    input_vars = [K,K_e, Cl,Cl_e]
+    output_vars = [I_K, I_Cl]
+
     I = g * (R * T / F) * log((K * Cl) / (K_e * Cl_e))
     eqs = [
         I_K  ~ I,
         I_Cl ~ I,
     ]
 
-    default_u0 = [
+    defaults = [
         I_K => 0.0,
         I_Cl => 0.0,
-    ]
-    default_p = [
         g => 1.3, #fmol/(s/V)
     ]
 
-    return ODESystem(eqs,t,default_u0=default_u0,default_p=default_p,name=name, parent=parent)
+    return ODESystem(eqs,t,defaults=defaults,name=name, parent=parent,
+    input_vars=input_vars,output_vars=output_vars)
+end
+
+
+function SERCA(parent=nothing,default_u0=[],default_p=[];name=gensym(:serca))
+    @parameters t
+    D = Differential(t)
+
+    @parameters g
+    @variables Ca_e(t), JCa(t)
+
+    vars = [Ca_e, JCa]
+    ps = [g]
+    input_vars = [Ca_e]
+    output_vars = [JCa]
+
+
+
+    eqs = [
+        JCa ~ g * (Ca_e^2 / (Ca_e^2 + 20.0^2)),
+    ]
+
+    defaults = [
+        JCa => 0.0,
+        g => 54.5,#0.4,
+    ]
+
+    return ODESystem(eqs,t,vars,ps,defaults=defaults,name=name, parent=parent,
+    input_vars=input_vars,output_vars=output_vars)
+end
+
+function IP3R(parent=nothing; name=gensym(:ip3r))
+    @parameters t
+    D = Differential(t)
+
+    @parameters g
+    @variables IP3_e(t), Ca(t), Ca_e(t), JCa(t)
+
+    vars = [IP3_e, Ca, Ca_e, JCa]
+    ps = [g]
+
+    input_vars = [IP3_e, Ca, Ca_e]
+    output_vars = [JCa]
+
+    eqs = [JCa ~ g * 1/(1+exp((-IP3_e+20)/4)) * (Ca_e - Ca)]
+
+    defaults = [g => 0.0, JCa => 0.0]
+    return ODESystem(eqs,t,vars,ps,defaults=defaults,name=name, parent=parent,
+    input_vars=input_vars,output_vars=output_vars)
 end

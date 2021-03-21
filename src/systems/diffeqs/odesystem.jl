@@ -70,6 +70,9 @@ struct ODESystem <: AbstractODESystem
     """
     structure::Any
     reduced_states::Vector
+
+    input_vars::Vector
+    output_vars::Vector
 end
 
 function ODESystem(
@@ -81,6 +84,8 @@ function ODESystem(
                    default_u0=Dict(),
                    default_p=Dict(),
                    defaults=_merge(Dict(default_u0), Dict(default_p)),
+                   input_vars = [],
+                   output_vars = [],
                   )
     iv′ = value(iv)
     dvs′ = value.(dvs)
@@ -101,7 +106,7 @@ function ODESystem(
         throw(ArgumentError("System names must be unique."))
     end
 
-    sys = ODESystem(deqs, iv′, dvs′, ps′, observed, tgrad, jac, Wfact, Wfact_t, name, systems, defaults, nothing, [])
+    sys = ODESystem(deqs, iv′, dvs′, ps′, observed, tgrad, jac, Wfact, Wfact_t, name, systems, defaults, nothing, [], input_vars, output_vars)
 
     if parent != nothing && parent != false
         push!(get_systems(parent), sys)
@@ -427,4 +432,136 @@ function collect_mappings!(sys::AbstractSystem, eq::Equation, sys_array=nothing)
     reverse!(sys_array)
     reverse!(lhs_pairs)
     return lhs_pairs, sys_array
+end
+
+
+
+function remove_namespace(sys,expr)
+    sys_parts = split(string(nameof(sys)), "₊")
+
+    parts = split(string(expr), "₊")
+    parts[end] = split(parts[end],"(t)")[1]
+
+    #@show sys_parts
+    #@show parts
+
+    if length(parts) == 1
+        return getproperty(sys,Symbol(parts[1]),namespace=false) 
+    end
+
+    curr = getproperty(sys,Symbol(parts[2]),namespace=false)
+    for p in parts[3:end]
+        curr = getproperty(curr,Symbol(p))
+    end
+
+    return curr
+end
+
+
+function insert_subsystem!(sys,sub, sys_in_vars, sys_dst_vars)
+    # check arguments
+    if length(sys_in_vars) != length(sub.input_vars)
+    end
+    if length(sys_dst_vars) != length(sub.output_vars)
+    end
+
+
+
+
+    # insert_subsystem!(soma, NavChannel(name=:NavC), [soma.v,soma.Na,soma.Na_e], [soma.INa])
+    # sys = soma
+    # get without namespace -> input_vars = [v,Na,Na_e], output_vars = [INa]
+    # rm: soma
+    # add to soma:
+    # NavC.v ~ v
+    # NavC.Na ~ Na
+    # NavC.Na_e ~ Na_e
+    # if exists(sys.eqs[INa]): INa ~ sys.eqs[INa].rhs + NavC.I
+    # else: INa ~ NavC.I
+
+    # from outside
+    # insert_subsystem!(net1.cc1.soma, NavChannel(name=:NavC), [net1.cc1.soma.v,net1.cc1.soma.Na,net1.cc1.soma.Na_e], [net1.cc1.soma.INa])
+    # sys = net1.cc1.soma
+    # get without namespace -> sys = soma ??? mby not needed
+    # get without namespace -> input_vars = [v,Na,Na_e], output_vars = [INa]
+    # rm: net1.cc1.soma
+    # add to soma:
+    # NavC.v ~ v
+    # NavC.Na ~ Na
+    # NavC.Na_e ~ Na_e
+    # if exists(sys.eqs[INa]): INa ~ sys.eqs[INa].rhs + NavC.I
+    # else: INa ~ NavC.I
+
+    # insert_subsystem!(net1, GJ1(name=:syn1), [net1.cc1.soma.v,net1.cc2.soma.v], [net1.cc2.soma.I_syn])
+    # sys = net1
+    # get without namespace -> input_vars = [cc1.soma.v,cc2.soma.v], output_vars = [cc2.soma.I_syn]
+    # rm: net1
+    # add to net1:
+    # syn1.v_pre ~ cc1.soma.v
+    # syn1.v_post ~ cc2.soma.v
+    # if exists(soma.eqs[I_syn]): cc2.soma.I_syn ~ soma.eqs[I_syn].rhs + syn1.I
+    # else: cc2.soma.I_syn ~ syn1.I
+    # !!!
+    # cc2.soma.eqs[idx] = I_syn ~ 0.0
+    # "remove" -> soma.eqs[idx] = t ~ t
+
+
+
+    push!(get_systems(sys), sub)
+
+
+    sys_in_vars = [remove_namespace(sys,v) for v in sys_in_vars]
+    sys_dst_vars = [remove_namespace(sys,v) for v in sys_dst_vars]
+
+    eqs = Equation[]
+    # new_eq = sub.input_vars[i] ~ sys_in_vars[i]
+    for (i,in_v) in enumerate(sys_in_vars)
+        new_eq = getproperty(sub,sub.input_vars[i].val.f.name) ~ in_v
+        push!(eqs, new_eq)
+    end
+    # new_eq = sys_dst_vars[i] ~ sub.output_vars[i]
+    for (i,out_v) in enumerate(sys_dst_vars)
+        new_eq = out_v ~ getproperty(sub,sub.output_vars[i].val.f.name)
+        push!(eqs, new_eq)
+    end
+
+
+    for (j,eq) in enumerate(eqs)
+        parts = split(string(eq.lhs), "₊")
+        parts[end] = split(parts[end],"(t)")[1]
+        subsys = sys
+        if length(parts) > 1
+            for p in parts[1:end-1]
+                subsys = getproperty(subsys, Symbol(p),namespace=false)
+            end
+        end
+        for (i,seq) in enumerate(get_eqs(subsys))
+            if string(seq.lhs) == string(getproperty(subsys,Symbol(parts[end]),namespace=false))
+                eqs[j] = eqs[j].lhs ~ seq.rhs + eqs[j].rhs
+                get_eqs(subsys)[i] = get_iv(subsys) ~ get_iv(subsys)
+            end
+        end
+    end
+
+
+    for eq in eqs
+        lhs_exists = false
+        found_at = 0
+        for (i,seq) in enumerate(get_eqs(sys))
+            if string(seq.lhs) == string(eq.lhs)
+                lhs_exists = true
+                found_at = i
+                break
+            end
+        end
+        seqs = get_eqs(sys)
+        new_eq = eq
+        if lhs_exists
+            seq = seqs[found_at]
+            new_eq = seq.lhs ~ new_eq.rhs + seq.rhs
+            seqs[found_at] = get_iv(sys) ~ get_iv(sys)
+        end
+        push!(seqs, new_eq)
+    end
+    #insert_comp!(sys, sub, eqs)
 end

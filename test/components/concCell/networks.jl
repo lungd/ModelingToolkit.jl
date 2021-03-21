@@ -6,6 +6,9 @@ function CCellNet(parent=nothing,default_u0=[],default_p=[];name=gensym(:CCNet))
     @variables Ca(t), K(t), Na(t), Cl(t)
     @variables JCa(t), JK(t), JNa(t), JCl(t)
 
+    input_vars = []
+    output_vars = []
+
     eqs = Equation[
         D(Ca) ~ JCa,
         D(K) ~ JK,
@@ -17,7 +20,7 @@ function CCellNet(parent=nothing,default_u0=[],default_p=[];name=gensym(:CCNet))
         JNa ~ 0.0,
         JCl ~ 0.0,
     ]
-    default_u0 = [
+    defaults = [
         Ca => 140.2,
         K => 3.0,
         Na => 152.8,
@@ -30,16 +33,28 @@ function CCellNet(parent=nothing,default_u0=[],default_p=[];name=gensym(:CCNet))
     ]
     vars = [Ca, K, Na, Cl, JCa, JK, JNa, JCl]
     ps = []
-    sys = ODESystem(eqs,t,vars,ps,default_u0=default_u0,default_p=default_p,name=name, parent=parent)
+    sys = ODESystem(eqs,t,vars,ps,defaults=defaults,name=name, parent=parent,
+    input_vars=input_vars,output_vars=output_vars)
 
     # sub-components
-    @named cc = ConcCell()
+    @named cc1 = ConcCell()
+    @named cc2 = ConcCell()
 
-    insert_comp!(sys, cc, [
-        cc.soma.Ca_e ~ Ca,
-        cc.soma.K_e ~ K,
-        cc.soma.Na_e ~ Na,
-        cc.soma.Cl_e ~ Cl,
+    #insert_subsystem!(sys, ConcCell(name=:cc1), [sys.Ca,sys.K,sys.Na,sys.Cl], [])
+
+    insert_comp!(sys, cc1, [
+        cc1.soma.Ca_e ~ Ca,
+        cc1.soma.K_e ~ K,
+        cc1.soma.Na_e ~ Na,
+        cc1.soma.Cl_e ~ Cl,
     ])
+    insert_comp!(sys, cc2, [
+        cc2.soma.Ca_e ~ Ca,
+        cc2.soma.K_e ~ K,
+        cc2.soma.Na_e ~ Na,
+        cc2.soma.Cl_e ~ Cl,
+    ])
+
+    insert_subsystem!(sys, GJ1(name=:syn1), [sys.cc1.soma.v,sys.cc2.soma.v], [sys.cc2.soma.I_syn])
     return sys
 end

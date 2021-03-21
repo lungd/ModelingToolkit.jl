@@ -137,7 +137,7 @@ include("structural_transformation/StructuralTransformations.jl")
 #include("systems/diffeqs/parentodesystem.jl")
 #export ParentODESystem, has_parent, get_parent
 export rm_sys_namespace, get_lhs_systems, collect_mappings, collect_mappings!, split_systems
-export connect_comp!, insert_comp!
+export connect_comp!, insert_comp!, insert_subsystem!
 
 export ODESystem, ODEFunction, ODEFunctionExpr, ODEProblemExpr
 export SDESystem, SDEFunction, SDEFunctionExpr, SDESystemExpr
