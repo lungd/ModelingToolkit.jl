@@ -539,3 +539,7 @@ struct InvalidSystemException <: Exception
     msg::String
 end
 Base.showerror(io::IO, e::InvalidSystemException) = print(io, "InvalidSystemException: ", e.msg)
+
+
+get_default_u0(sys::AbstractSystem) = filter(e->!isparameter(e.first),get_defaults(sys))
+get_default_p(sys::AbstractSystem) = filter(e->isparameter(e.first),get_defaults(sys))
